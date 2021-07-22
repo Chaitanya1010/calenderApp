@@ -13,6 +13,18 @@
   }
 }
 
+.rbc-event-label {
+  display: none !important;
+}
+
+.disabled-div {
+  cursor: not-allowed;
+  width: 100%;
+  height: 100%;
+  background-color: "#c23";
+  opacity: 0.8;
+}
+
 .App-header {
   background-color: #282c34;
   min-height: 100vh;
@@ -35,4 +47,49 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/*CSS changes for react-big-calendar*/
+/* // to remove 30 mins */
+.rbc-time-gutter .rbc-timeslot-group:nth-child(even) .rbc-time-slot .rbc-label {
+  display: none !important;
+}
+
+/* // remove 30 mins border in the time slots */
+.rbc-time-gutter .rbc-timeslot-group:nth-child(odd) {
+  border: none !important;
+}
+
+/* // darken the 1 hour lines  */
+.rbc-day-slot .rbc-timeslot-group:nth-child(odd) {
+  border-top: solid black 0.7px !important;
+}
+.rbc-time-gutter .rbc-timeslot-group:nth-child(odd) {
+  border-top: solid black 0.7px !important;
+  /* or (none !important + label -> block + margin-top) */
+}
+
+/* // remove timeGutter */
+.rbc-allday-cell {
+  display: none;
+}
+
+.rbc-time-header-content > .rbc-row.rbc-row-resource {
+  border: none !important;
+}
+
+/* // remove extra border on top */
+.rbc-time-content {
+  border-top: none !important;
+}
+
+/* // make header look big */
+.rbc-header {
+  font-size: 115% !important;
+  padding: 10px !important;
+}
+
+/*to make the header look big*/
+.rbc-time-view .rbc-row {
+  min-height: 50px !important;
 }
