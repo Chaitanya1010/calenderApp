@@ -1,5 +1,5 @@
 import "./App.css";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect , useRef} from "react";
 import { Calendar, momentLocalizer, Views } from "react-big-calendar";
 import moment from "moment";
 import * as dates from "./dates";
@@ -14,6 +14,47 @@ import { render } from "@testing-library/react";
 const DragAndDropCalendar = withDragAndDrop(Calendar);
 const localizer = momentLocalizer(moment);
 
+const useLastResourceInterval = (callback, delay, timerStatus) => {
+
+  const savedCallback = useRef();
+
+   // Remember the latest callback.
+   useEffect(() => {
+    savedCallback.current = callback;
+  }, [callback]);
+
+
+  useEffect(() => {
+    let id;
+    if (timerStatus){
+      id = setInterval(() => {
+          savedCallback.current();
+        }, delay);
+    }else{
+      clearInterval(id);
+    }
+
+    return () => clearInterval(id);
+  }, [callback, delay, timerStatus]);
+}
+
+const lockLastActiveSlot = ({
+  getFirstEventStartTimeInLastResource,
+  setLastResourceActive,
+  setTimerStatus
+}) => {
+  console.log(
+    "inside interval function",
+    getFirstEventStartTimeInLastResource() < new Date(),
+    getFirstEventStartTimeInLastResource(),
+  );
+  if (getFirstEventStartTimeInLastResource() < new Date()) {
+    console.log("Interval is cleared and status updates");
+    setLastResourceActive(false);
+    setTimerStatus(false);
+  }
+};
+
 const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
   const [inputEvents, setInputEvents] = useState({
     events: [],
@@ -21,53 +62,56 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
 
   const [timerStatus, setTimerStatus] = useState(false);
   const [lastResourceActive, setLastResourceActive] = useState(true);
-  const [firstEventTime, setFirstEventTime] = useState("");
+  // const [firstEventTime, setFirstEventTime] = useState("");
 
-  useEffect(() => {
-    let interval;
+  // useEffect(() => {
+  //   let interval;
 
-    const lockLastActiveSlot = () => {
-      console.log(
-        "checking",
-        getFirstEventStartTimeInLastResource() < new Date(),
-        getFirstEventStartTimeInLastResource(),
-        firstEventTime,
-        inputEvents,
-        lastResourceActive
-      );
-      if (getFirstEventStartTimeInLastResource() < new Date()) {
-        console.log("Internval is cleared and status updates");
-        setLastResourceActive(false);
-        setTimerStatus(false);
-      }
-    };
+  //   console.log(
+  //     "Inside useEffect",
+  //     getFirstEventStartTimeInLastResource() < new Date(),
+  //     getFirstEventStartTimeInLastResource(),
+  //     lastResourceActive,
+  //     inputEvents
+  //   );
 
-    console.log(
-      "checking main",
-      getFirstEventStartTimeInLastResource() < new Date(),
-      getFirstEventStartTimeInLastResource(),
-      lastResourceActive
-    );
-    if (timerStatus)
-      interval = setInterval(function () {
-        lockLastActiveSlot();
-      }, 5000);
-    else {
-      clearInterval(interval);
-    }
+  //   if (timerStatus){
+  //     console.log("timerStatus is true")
+  //       interval = setInterval(function () {
+  //           lockLastActiveSlot({
+  //             getFirstEventStartTimeInLastResource,
+  //             inputEvents,
+  //             lastResourceActive,
+  //             setLastResourceActive,
+  //             setTimerStatus,
+  //           });
+  //       }, 5000);
+  //   }else {
+  //     clearInterval(interval);
+  //   }
 
-    return () => clearInterval(interval);
-  }, [timerStatus]);
+  //   return () => clearInterval(interval);
+  // }, [timerStatus]);
+
+  useLastResourceInterval(
+    () => {
+      lockLastActiveSlot({
+                getFirstEventStartTimeInLastResource,
+                setLastResourceActive,
+                setTimerStatus,
+              });
+    },
+     5000,
+     timerStatus)
 
   const getFirstEventStartTimeInLastResource = () => {
+    console.log({eventsInsideFunction: inputEvents})
     return inputEvents.events
       .filter((event) => event.resourceId === getLastResourceId())
       .map((event) => event.start)
       .sort()[0];
   };
 
-  if (firstEventTime === "")
-    setFirstEventTime(getFirstEventStartTimeInLastResource());
 
   const getNextId = () => {
     let idList = inputEvents.events.map((a) => a.id);
@@ -248,19 +292,6 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
     //setMin(moment("1:00am", "h:mma").toDate());
   };
 
-  if (getFirstEventStartTimeInLastResource()) {
-    if (
-      getFirstEventStartTimeInLastResource() < new Date() &&
-      lastResourceActive
-    ) {
-      console.log("Setting status as false");
-      setLastResourceActive(false);
-    } else if (lastResourceActive) {
-      console.log("Internval is set", timerStatus);
-      if (!timerStatus) setTimerStatus(true);
-    }
-  }
-
   const getTimeSlotStyle = (event) => {
     let styles =
       event.end - event.start > 900000
@@ -280,6 +311,24 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
           };
     return styles;
   };
+
+
+  if (getFirstEventStartTimeInLastResource()) {
+    if (
+      getFirstEventStartTimeInLastResource() < new Date() &&
+      lastResourceActive
+    ) {
+      console.log("Setting status as false");
+      setLastResourceActive(false);
+    } else if (lastResourceActive) {
+      console.log("Internval is set", timerStatus);
+      if (!timerStatus) {
+        setTimerStatus(true);
+      }
+    }
+  }
+
+
   return (
     <div style={{ display: "flex", flexDirection: "row" }}>
       <div style={{ width: "95%" }}>
