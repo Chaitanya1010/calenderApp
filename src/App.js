@@ -18,9 +18,56 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
   const [inputEvents, setInputEvents] = useState({
     events: [],
   });
-  const [restartTimer, setRestartTimer] = useState(false);
-  const [timerId, setTimerId] = useState(-1);
+
+  const [timerStatus, setTimerStatus] = useState(false);
   const [lastResourceActive, setLastResourceActive] = useState(true);
+  const [firstEventTime, setFirstEventTime] = useState("");
+
+  useEffect(() => {
+    let interval;
+
+    const lockLastActiveSlot = () => {
+      console.log(
+        "checking",
+        getFirstEventStartTimeInLastResource() < new Date(),
+        getFirstEventStartTimeInLastResource(),
+        firstEventTime,
+        inputEvents,
+        lastResourceActive
+      );
+      if (getFirstEventStartTimeInLastResource() < new Date()) {
+        console.log("Internval is cleared and status updates");
+        setLastResourceActive(false);
+        setTimerStatus(false);
+      }
+    };
+
+    console.log(
+      "checking main",
+      getFirstEventStartTimeInLastResource() < new Date(),
+      getFirstEventStartTimeInLastResource(),
+      lastResourceActive
+    );
+    if (timerStatus)
+      interval = setInterval(function () {
+        lockLastActiveSlot();
+      }, 5000);
+    else {
+      clearInterval(interval);
+    }
+
+    return () => clearInterval(interval);
+  }, [timerStatus]);
+
+  const getFirstEventStartTimeInLastResource = () => {
+    return inputEvents.events
+      .filter((event) => event.resourceId === getLastResourceId())
+      .map((event) => event.start)
+      .sort()[0];
+  };
+
+  if (firstEventTime === "")
+    setFirstEventTime(getFirstEventStartTimeInLastResource());
 
   const getNextId = () => {
     let idList = inputEvents.events.map((a) => a.id);
@@ -36,12 +83,6 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
     ];
   };
 
-  const getFirstEventStartTimeInLastResource = () => {
-    return inputEvents.events
-      .filter((event) => event.resourceId === getLastResourceId())
-      .map((event) => event.start)
-      .sort()[0];
-  };
   console.log(getFirstEventStartTimeInLastResource(), "Events");
 
   const getResourceMap = () => {
@@ -207,20 +248,6 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
     //setMin(moment("1:00am", "h:mma").toDate());
   };
 
-  const lockLastActiveSlot = () => {
-    console.log(
-      "checking",
-      getFirstEventStartTimeInLastResource() < new Date(),
-      getFirstEventStartTimeInLastResource(),
-      lastResourceActive
-    );
-    if (getFirstEventStartTimeInLastResource() < new Date()) {
-      console.log("Internval is cleared and status updates");
-      setLastResourceActive(false);
-      clearInterval(timerId);
-    }
-  };
-
   if (getFirstEventStartTimeInLastResource()) {
     if (
       getFirstEventStartTimeInLastResource() < new Date() &&
@@ -229,13 +256,8 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
       console.log("Setting status as false");
       setLastResourceActive(false);
     } else if (lastResourceActive) {
-      console.log("Internval is set", timerId);
-      if (timerId === -1) {
-        setInterval(function () {
-          lockLastActiveSlot();
-        }, 5000);
-        setTimerId(1);
-      }
+      console.log("Internval is set", timerStatus);
+      if (!timerStatus) setTimerStatus(true);
     }
   }
 
