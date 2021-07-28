@@ -1,13 +1,11 @@
 import "./App.css";
-import React, { useState, useEffect , useRef} from "react";
-import { Calendar, momentLocalizer, Views } from "react-big-calendar";
+import React, { useState, useEffect, useRef } from "react";
+import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
-import * as dates from "./dates";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.scss";
-import { render } from "@testing-library/react";
 
 // Setup the localizer by providing the moment (or globalize) Object
 // to the correct localizer.
@@ -15,41 +13,33 @@ const DragAndDropCalendar = withDragAndDrop(Calendar);
 const localizer = momentLocalizer(moment);
 
 const useLastResourceInterval = (callback, delay, timerStatus) => {
-
   const savedCallback = useRef();
 
-   // Remember the latest callback.
-   useEffect(() => {
+  // Remember the latest callback.
+  useEffect(() => {
     savedCallback.current = callback;
   }, [callback]);
 
-
   useEffect(() => {
     let id;
-    if (timerStatus){
+    if (timerStatus) {
       id = setInterval(() => {
-          savedCallback.current();
-        }, delay);
-    }else{
+        savedCallback.current();
+      }, delay);
+    } else {
       clearInterval(id);
     }
 
     return () => clearInterval(id);
   }, [callback, delay, timerStatus]);
-}
+};
 
 const lockLastActiveSlot = ({
   getFirstEventStartTimeInLastResource,
   setLastResourceActive,
-  setTimerStatus
+  setTimerStatus,
 }) => {
-  console.log(
-    "inside interval function",
-    getFirstEventStartTimeInLastResource() < new Date(),
-    getFirstEventStartTimeInLastResource(),
-  );
   if (getFirstEventStartTimeInLastResource() < new Date()) {
-    console.log("Interval is cleared and status updates");
     setLastResourceActive(false);
     setTimerStatus(false);
   }
@@ -62,56 +52,27 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
 
   const [timerStatus, setTimerStatus] = useState(false);
   const [lastResourceActive, setLastResourceActive] = useState(true);
-  // const [firstEventTime, setFirstEventTime] = useState("");
-
-  // useEffect(() => {
-  //   let interval;
-
-  //   console.log(
-  //     "Inside useEffect",
-  //     getFirstEventStartTimeInLastResource() < new Date(),
-  //     getFirstEventStartTimeInLastResource(),
-  //     lastResourceActive,
-  //     inputEvents
-  //   );
-
-  //   if (timerStatus){
-  //     console.log("timerStatus is true")
-  //       interval = setInterval(function () {
-  //           lockLastActiveSlot({
-  //             getFirstEventStartTimeInLastResource,
-  //             inputEvents,
-  //             lastResourceActive,
-  //             setLastResourceActive,
-  //             setTimerStatus,
-  //           });
-  //       }, 5000);
-  //   }else {
-  //     clearInterval(interval);
-  //   }
-
-  //   return () => clearInterval(interval);
-  // }, [timerStatus]);
+  const [addNewResourceWithNoEvents, setAddNewResourceWithNoEvents] =
+    useState(false);
 
   useLastResourceInterval(
     () => {
       lockLastActiveSlot({
-                getFirstEventStartTimeInLastResource,
-                setLastResourceActive,
-                setTimerStatus,
-              });
+        getFirstEventStartTimeInLastResource,
+        setLastResourceActive,
+        setTimerStatus,
+      });
     },
-     5000,
-     timerStatus)
+    5000,
+    timerStatus
+  );
 
   const getFirstEventStartTimeInLastResource = () => {
-    console.log({eventsInsideFunction: inputEvents})
     return inputEvents.events
       .filter((event) => event.resourceId === getLastResourceId())
       .map((event) => event.start)
       .sort()[0];
   };
-
 
   const getNextId = () => {
     let idList = inputEvents.events.map((a) => a.id);
@@ -122,12 +83,12 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
 
   const getLastResourceId = () => {
     if (inputEvents.events.length === 0) return 1;
-    return inputEvents.events.map((event) => event.resourceId).sort()[
-      inputEvents.events.length - 1
-    ];
+    let lastResourceId = inputEvents.events
+      .map((event) => event.resourceId)
+      .sort()[inputEvents.events.length - 1];
+    if (addNewResourceWithNoEvents) return lastResourceId + 1;
+    else return lastResourceId;
   };
-
-  console.log(getFirstEventStartTimeInLastResource(), "Events");
 
   const getResourceMap = () => {
     const resourceMap = [];
@@ -145,22 +106,47 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
     return resourceMap;
   };
 
-  const canAddorChangeEvent = (start, end, resourceId) => {
-    console.log("the dates are", new Date() < start, getLastResourceId());
-    if (
-      resourceId === getLastResourceId() &&
-      lastResourceActive &&
-      Date.now() < start
-    )
+  const basicCheck = (start, end) => {
+    return (
+      lastResourceActive && start >= min && end <= max //&& Date.now() < start
+    );
+  };
+
+  const canAddEvent = (start, end, resourceId) => {
+    if (resourceId === getLastResourceId() && basicCheck(start, end))
       return true;
+    return false;
+  };
+
+  const canMoveEvent = (event, start, end, resourceId) => {
+    if (canAddEvent(start, end, resourceId)) {
+      if (resourceId === getLastResourceId()) return true;
+    }
+    return false;
+  };
+
+  const checkIfClonedEventExists = (event, resourceId) => {
+    const clonedEvents = inputEvents.events.filter(
+      (existing_event) =>
+        existing_event.resourceId === resourceId &&
+        existing_event.clonedId === event.id
+    );
+    if (clonedEvents.length > 0) return true;
+    return false;
+  };
+
+  const canResizeEvent = (event, start, end) => {
+    if (event.resourceId === getLastResourceId() && basicCheck(start, end)) {
+      return true;
+    }
+    return false;
   };
 
   const createEvent = ({ start, end, resourceId }) => {
-    if (!canAddorChangeEvent(start, end, resourceId)) return false;
+    if (!canAddEvent(start, end, resourceId)) return false;
+
     const title = window.prompt("New Event name");
     if (title) {
-      //const [displayStartTime, displayEndTime] = getFactoredTimings(start, end);
-
       setInputEvents((prevState) => {
         return {
           events: [
@@ -175,55 +161,35 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
           ],
         };
       });
+      setAddNewResourceWithNoEvents(false);
     }
   };
 
   const moveEvent = ({ event, start, end, resourceId }) => {
+    if (!canMoveEvent(event, start, end, resourceId)) return false;
+
     const events = inputEvents.events;
     const idx = events.indexOf(event);
     let updatedEvent = {};
     const nextEvents = [...events];
 
-    // moving it back to original place if it's replanned or moved from 2 -> 1
-    if (
-      event.rePlannedStatus ||
-      (event.resourceId === 2 && resourceId === 1) ||
-      start < min ||
-      end > max
-    ) {
-      if (
-        event.start === start &&
-        event.end === end &&
-        event.resourceId === resourceId
-      ) {
-        return;
-      } else {
-        moveEvent({
-          event: event,
-          start: event.start,
-          end: event.end,
-          resourceId: event.resourceId,
-        });
-        return;
-      }
-    }
-    // moving it between cols
-    else if (event.resourceId === 1 && event.resourceId !== resourceId) {
+    // move across 2 cols
+    console.log("in move event", event, start, end, resourceId);
+    if (event.resourceId !== getLastResourceId()) {
+      if (checkIfClonedEventExists(event, resourceId)) return false;
       updatedEvent = {
         ...event,
         start,
         end,
         resourceId,
+        clonedId: event.id,
         id: getNextId(),
       };
       nextEvents.push(updatedEvent);
 
       updatedEvent = { ...event, rePlannedStatus: true };
       nextEvents.splice(idx, 1, updatedEvent);
-    }
-    // moving it normally
-    else {
-      //const [displayStartTime, displayEndTime] = getFactoredTimings(start, end);
+    } else {
       updatedEvent = {
         ...event,
         start,
@@ -238,29 +204,9 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
   };
 
   const resizeEvent = ({ event, start, end }) => {
-    console.log("in resize here");
+    if (!canResizeEvent(event, start, end)) return false;
 
     const events = inputEvents.events;
-
-    // resizing to it's original shape
-    if (
-      event.rePlannedStatus ||
-      start < min ||
-      end > max ||
-      start - end === 0
-    ) {
-      if (event.start === start && event.end === end) return;
-      else {
-        resizeEvent({
-          event: event,
-          start: event.start,
-          end: event.end,
-        });
-        return;
-      }
-    }
-
-    //const [displayStartTime, displayEndTime] = getFactoredTimings(start, end);
     const nextEvents = events.map((existingEvent) => {
       return existingEvent.id === event.id
         ? { ...existingEvent, start, end }
@@ -292,42 +238,47 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
     //setMin(moment("1:00am", "h:mma").toDate());
   };
 
-  const getTimeSlotStyle = (event) => {
-    let styles =
-      event.end - event.start > 900000
-        ? {
-            margin: "0px",
-            padding: "4px",
-            fontSize: "20px",
-            fontWeight: "bold",
-            textAlign: "center",
-          }
-        : {
-            margin: "0px",
-            padding: "1px",
-            fontSize: "13px",
-            fontWeight: "bold",
-            textAlign: "center",
+  const replanEvents = () => {
+    const upcomingEvents = inputEvents.events.filter(
+      (event) =>
+        event.resourceId === getLastResourceId() && event.start > new Date()
+    );
+    if (upcomingEvents.length > 0) {
+      const newId = getNextId();
+      upcomingEvents.map((upcomingEvent, index) => {
+        let addingEvent = {
+          start: upcomingEvent.start,
+          end: upcomingEvent.end,
+          title: upcomingEvent.title,
+          clonedId: upcomingEvent.id,
+          id: newId + index,
+          resourceId: getLastResourceId() + 1,
+        };
+        setInputEvents((prevState) => {
+          return {
+            events: [...prevState.events, addingEvent],
           };
-    return styles;
+        });
+        return addingEvent;
+      });
+    } else {
+      setAddNewResourceWithNoEvents(true);
+    }
+    setLastResourceActive(true);
   };
-
 
   if (getFirstEventStartTimeInLastResource()) {
     if (
       getFirstEventStartTimeInLastResource() < new Date() &&
       lastResourceActive
     ) {
-      console.log("Setting status as false");
       setLastResourceActive(false);
     } else if (lastResourceActive) {
-      console.log("Internval is set", timerStatus);
       if (!timerStatus) {
         setTimerStatus(true);
       }
     }
   }
-
 
   return (
     <div style={{ display: "flex", flexDirection: "row" }}>
@@ -359,10 +310,13 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
           resourceIdAccessor="resourceId"
           resourceTitleAccessor="resourceTitle"
           eventPropGetter={(event, start, end, isSelected) => {
-            if (event.rePlannedStatus)
+            if (event.resourceId !== getLastResourceId())
               return {
                 className: "",
-                style: { backgroundColor: "red", opacity: 0.5 },
+                style: {
+                  backgroundColor: "#8c8f8d",
+                  opacity: 0.7,
+                },
               };
             if (event.resourceId === 2)
               return {
@@ -376,17 +330,23 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
           //     return { style: { cursor: "not-allowed" } };
           //   else return { style: { cursor: "pointer" } };
           // }}
-          components={{
-            day: {
-              event: ({ event }) => {
-                return (
-                  <div className={event.rePlannedStatus ? "disabled-div" : ""}>
-                    <p style={getTimeSlotStyle(event)}>{event.title}</p>
-                  </div>
-                );
-              },
-            },
-          }}
+          // components={{
+          //   day: {
+          //     event: ({ event }) => {
+          //       return (
+          //         <div
+          //           className={
+          //             event.resourceId !== getLastResourceId()
+          //               ? "disabled-div"
+          //               : ""
+          //           }
+          //         >
+          //           <p style={getTimeSlotStyle(event)}>{event.title}</p>
+          //         </div>
+          //       );
+          //     },
+          //   },
+          // }}
         />
       </div>
       <div
@@ -397,7 +357,9 @@ const MyCalendar = ({ localizer = {}, min = {}, max = {} }) => {
         }}
       >
         <div>
-          <button disabled={false}>Replan</button>
+          <button disabled={lastResourceActive} onClick={replanEvents}>
+            Replan
+          </button>
         </div>
       </div>
     </div>
